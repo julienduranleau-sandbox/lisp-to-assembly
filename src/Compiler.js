@@ -3,7 +3,7 @@ module.exports = class Compiler {
         this.output = null
     }
 
-    get memoryIndices() { return ['RDI', 'RSI', 'RDX'] }
+    get memoryIndices() { return ['rdi', 'rsi', 'rdx'] }
     get functions() { return {
         '+': 'plus'
     }}
@@ -17,37 +17,48 @@ module.exports = class Compiler {
     }
 
     prefix() {
-        this.emit('.global _main', 1)
-        this.emit('.text', 1)
-        this.emit('')
-        this.emit('plus:')
-        this.emit('ADD RDI, RSI', 1)
-        this.emit('MOV RAX, RDI', 1)
-        this.emit('RET', 1)
-        this.emit('')
-        this.emit('_main:')
+        this.emit('extern printf, exit', 0)
+            this.emit('', 0)
+        this.emit('section .data', 0)
+            this.emit('format db "%x", 10, 1', 1)
+            this.emit('', 0)
+        this.emit('section .text', 0)
+            this.emit('global main', 1)
+            this.emit('', 0)
+            this.emit('plus:', 1)
+                this.emit('add rdi, rsi', 2)
+                this.emit('mov rax, rdi', 2)
+                this.emit('ret', 2)
+                this.emit('', 0)
+            this.emit('main:', 1)
     }
 
     postfix() {
-        this.emit('MOV RDI, RAX')
-        this.emit('MOV RAX, 60')
-        this.emit('SYSCALL')
+        this.emit('; Print value stored in rax register')
+        this.emit('sub rsp, 8')
+        this.emit('mov rsi, rax')
+        this.emit('mov rdi, format')
+        this.emit('call printf')
+        this.emit('')
+        this.emit('; Exit')
+        this.emit('mov rdi, 0')
+        this.emit('call exit')
     }
 
     compileFn(fn, args, memoryIndex) {
         for (let i = 0; i < args.length; i++) {
-            this.emit(`PUSH ${this.memoryIndices[i]}`)
+            this.emit(`push ${this.memoryIndices[i]}`)
             this.compileArgument(args[i], this.memoryIndices[i])
         }
 
-        this.emit(`CALL ${this.functions[fn] || fn}`)
+        this.emit(`call ${this.functions[fn] || fn}`)
 
         for (let i = args.length - 1; i >= 0; i--) {
-            this.emit(`POP ${this.memoryIndices[i]}`)
+            this.emit(`pop ${this.memoryIndices[i]}`)
         }
 
         if (memoryIndex) {
-            this.emit(`MOV ${memoryIndex}, RAX`)
+            this.emit(`mov ${memoryIndex}, rax`)
         }
 
         this.emit('')
@@ -59,10 +70,10 @@ module.exports = class Compiler {
             return
         }
 
-        this.emit(`MOV ${memoryIndex}, ${arg}`) // move number in register
+        this.emit(`mov ${memoryIndex}, ${arg}`) // move number in register
     }
 
-    emit(code, indentLevel = 0) {
+    emit(code, indentLevel = 2) {
         this.output += '   '.repeat(indentLevel) + code + "\n"
     }
 }
